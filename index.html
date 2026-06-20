@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nevil · Body Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0D1117;
+    --card: #161B26;
+    --card2: #1C2333;
+    --border: #2A3347;
+    --mint: #00E5A0;
+    --mint-dim: rgba(0,229,160,0.12);
+    --amber: #F5A623;
+    --amber-dim: rgba(245,166,35,0.12);
+    --red: #FF5C5C;
+    --red-dim: rgba(255,92,92,0.12);
+    --blue: #4DA8FF;
+    --blue-dim: rgba(77,168,255,0.12);
+    --text: #F0F4FF;
+    --muted: #6B7A99;
+    --muted2: #3A4560;
+    --radius: 16px;
+    --radius-sm: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    max-width: 480px;
+    margin: 0 auto;
+    padding-bottom: 90px;
+  }
+  .num { font-family: 'Space Grotesk', sans-serif; }
+
+  /* Header */
+  .header {
+    padding: 20px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .header-title { font-size: 22px; font-weight: 600; }
+  .header-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--mint-dim);
+    border: 2px solid var(--mint);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  /* Tab Bar */
+  .tabs {
+    position: fixed;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: 100%; max-width: 480px;
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    display: flex;
+    padding: 10px 0 calc(10px + env(safe-area-inset-bottom));
+    z-index: 100;
+  }
+  .tab {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 4px;
+    cursor: pointer;
+    padding: 4px 0;
+    border: none; background: none; color: var(--muted);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 11px; font-weight: 500;
+    transition: color 0.2s;
+  }
+  .tab.active { color: var(--mint); }
+  .tab svg { width: 22px; height: 22px; }
+
+  /* Screens */
+  .screen { display: none; padding: 20px; padding-top: 16px; }
+  .screen.active { display: block; }
+
+  /* Cards */
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px;
+    margin-bottom: 14px;
+  }
+  .card-label {
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 12px;
+  }
+
+  /* Weight Arc (signature element) */
+  .arc-wrap {
+    display: flex; flex-direction: column; align-items: center;
+    padding: 10px 0 0;
+  }
+  .arc-svg { overflow: visible; }
+  .arc-track { fill: none; stroke: var(--border); stroke-width: 10; stroke-linecap: round; }
+  .arc-fill { fill: none; stroke: var(--mint); stroke-width: 10; stroke-linecap: round;
+    transition: stroke-dashoffset 0.8s cubic-bezier(.4,0,.2,1), stroke 0.4s; }
+  .arc-center { text-anchor: middle; dominant-baseline: middle; }
+  .arc-weight { font-family: 'Space Grotesk', sans-serif; font-size: 38px; font-weight: 700; fill: var(--text); }
+  .arc-unit { font-family: 'DM Sans', sans-serif; font-size: 13px; fill: var(--muted); }
+  .arc-label { font-family: 'DM Sans', sans-serif; font-size: 12px; fill: var(--muted); }
+  .arc-delta {
+    display: inline-block;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 13px; font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-top: 6px;
+  }
+  .delta-up { background: var(--amber-dim); color: var(--amber); }
+  .delta-down { background: var(--mint-dim); color: var(--mint); }
+  .delta-same { background: var(--card2); color: var(--muted); }
+
+  /* Form inputs */
+  .form-group { margin-bottom: 14px; }
+  .form-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; display: block; font-weight: 500; }
+  .form-input {
+    width: 100%;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px; font-weight: 500;
+    padding: 12px 14px;
+    height: 48px;
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .form-input:focus { border-color: var(--mint); }
+  .form-input::placeholder { color: var(--muted2); font-family: 'DM Sans', sans-serif; font-size: 14px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .form-row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+
+  /* Buttons */
+  .btn {
+    width: 100%; padding: 14px;
+    background: var(--mint); color: #0D1117;
+    border: none; border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    margin-top: 4px;
+  }
+  .btn:hover { opacity: 0.92; }
+  .btn:active { transform: scale(0.98); }
+  .btn-outline {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    margin-top: 8px;
+  }
+  .btn-outline:hover { border-color: var(--mint); color: var(--mint); background: var(--mint-dim); }
+
+  /* Stat pills */
+  .stat-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
+  .stat-pill {
+    flex: 1; min-width: 80px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 10px;
+    text-align: center;
+  }
+  .stat-pill-val { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; }
+  .stat-pill-lbl { font-size: 10px; color: var(--muted); margin-top: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; }
+
+  /* Status badge */
+  .badge {
+    display: inline-block;
+    font-size: 10px; font-weight: 600;
+    padding: 2px 8px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .badge-green { background: var(--mint-dim); color: var(--mint); }
+  .badge-amber { background: var(--amber-dim); color: var(--amber); }
+  .badge-red { background: var(--red-dim); color: var(--red); }
+  .badge-blue { background: var(--blue-dim); color: var(--blue); }
+
+  /* Progress bar */
+  .prog-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .prog-label { font-size: 13px; color: var(--text); flex: 0 0 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .prog-bar-wrap { flex: 1; background: var(--card2); height: 6px; border-radius: 10px; overflow: hidden; }
+  .prog-bar { height: 100%; border-radius: 10px; transition: width 0.6s ease; }
+  .prog-val { font-family: 'Space Grotesk', sans-serif; font-size: 12px; color: var(--muted); flex: 0 0 42px; text-align: right; }
+
+  /* Mini line chart */
+  .mini-chart-wrap { position: relative; }
+  .mini-chart { width: 100%; height: 90px; overflow: visible; }
+  .chart-line { fill: none; stroke: var(--mint); stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+  .chart-area { fill: url(#grad-mint); }
+  .chart-dot { fill: var(--mint); }
+  .chart-dot-last { fill: var(--bg); stroke: var(--mint); stroke-width: 2.5; }
+  .chart-empty {
+    text-align: center; padding: 30px 0;
+    color: var(--muted); font-size: 13px;
+  }
+  .chart-labels { display: flex; justify-content: space-between; margin-top: 4px; }
+  .chart-labels span { font-size: 10px; color: var(--muted); }
+
+  /* History entries */
+  .entry {
+    display: flex; align-items: center; gap: 14px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .entry:last-child { border-bottom: none; }
+  .entry-date-col { flex: 0 0 44px; text-align: center; }
+  .entry-day { font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 700; line-height: 1; }
+  .entry-mon { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .entry-info { flex: 1; }
+  .entry-weight { font-family: 'Space Grotesk', sans-serif; font-size: 16px; font-weight: 600; }
+  .entry-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .entry-delta { font-family: 'Space Grotesk', sans-serif; font-size: 13px; font-weight: 600; }
+  .entry-del { background: none; border: none; color: var(--muted2); cursor: pointer; padding: 4px; border-radius: 6px; font-size: 16px; transition: color 0.2s; }
+  .entry-del:hover { color: var(--red); }
+
+  /* AI Chat */
+  .ai-bubble {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: 14px 14px 14px 4px;
+    padding: 14px 16px;
+    font-size: 14px; line-height: 1.6;
+    color: var(--text);
+    margin-bottom: 14px;
+  }
+  .ai-bubble .ai-tag {
+    font-size: 10px; font-weight: 600; color: var(--mint);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 6px; display: block;
+  }
+  .ai-typing { display: flex; gap: 4px; align-items: center; padding: 4px 0; }
+  .ai-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); opacity: 0.4;
+    animation: pulse 1.2s ease-in-out infinite; }
+  .ai-dot:nth-child(2) { animation-delay: 0.2s; }
+  .ai-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes pulse { 0%,80%,100%{opacity:0.2;transform:scale(0.8)} 40%{opacity:1;transform:scale(1)} }
+
+  /* Section title */
+  .section-title {
+    font-size: 13px; font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 12px; margin-top: 4px;
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%);
+    background: var(--mint); color: #0D1117;
+    padding: 10px 20px; border-radius: 30px;
+    font-weight: 600; font-size: 13px;
+    opacity: 0; transition: opacity 0.3s;
+    z-index: 200; pointer-events: none;
+    white-space: nowrap;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Bulk import */
+  .bulk-textarea {
+    width: 100%;
+    min-height: 120px;
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-family: 'Space Grotesk', monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    padding: 12px 14px;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s;
+  }
+  .bulk-textarea:focus { border-color: var(--mint); }
+  .bulk-textarea::placeholder { color: var(--muted2); font-family: 'DM Sans', sans-serif; font-size: 13px; }
+  .prompt-box {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    font-family: 'Space Grotesk', monospace;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  details.prompt-details summary {
+    font-size: 12px; color: var(--blue); cursor: pointer;
+    list-style: none; user-select: none;
+  }
+  details.prompt-details summary::-webkit-details-marker { display: none; }
+  details.prompt-details summary::before { content: '▸ '; }
+  details.prompt-details[open] summary::before { content: '▾ '; }
+
+  /* Divider */
+  .divider {
+    display: flex; align-items: center; gap: 12px;
+    margin: 16px 0;
+  }
+  .divider-line { flex: 1; height: 1px; background: var(--border); }
+  .divider-text { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+
+  /* Report section */
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .report-tile {
+    background: var(--card2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 14px 12px;
+  }
+  .report-tile-val { font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; }
+  .report-tile-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .report-tile-status { margin-top: 6px; }
+
+  /* Scrollable */
+  ::-webkit-scrollbar { display: none; }
+
+  /* Responsive tweak */
+  @media (max-width: 360px) {
+    .form-row3 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <div class="header-title" id="screen-title">Log Entry</div>
+    <div class="header-sub" id="screen-sub">Track your body data</div>
+  </div>
+  <div class="avatar">🏋🏻</div>
+</div>
+
+<!-- LOG SCREEN -->
+<div class="screen active" id="screen-log">
+
+  <!-- Arc weight display -->
+  <div class="card" style="padding-bottom: 10px;">
+    <div class="card-label">Today's Weight</div>
+    <div class="arc-wrap">
+      <svg class="arc-svg" width="220" height="130" viewBox="0 0 220 130">
+        <defs>
+          <linearGradient id="arc-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" style="stop-color:#00E5A0"/>
+            <stop offset="100%" style="stop-color:#4DA8FF"/>
+          </linearGradient>
+        </defs>
+        <path class="arc-track" id="arc-track"
+          d="M 20 120 A 90 90 0 1 1 200 120"
+          stroke-dasharray="283" stroke-dashoffset="0"/>
+        <path class="arc-fill" id="arc-fill"
+          d="M 20 120 A 90 90 0 1 1 200 120"
+          stroke="url(#arc-grad)"
+          stroke-dasharray="283" stroke-dashoffset="283"/>
+        <text class="arc-center arc-weight" id="arc-val" x="110" y="90">––</text>
+        <text class="arc-center arc-unit" x="110" y="112">kg</text>
+        <text class="arc-center arc-label" x="20" y="126" style="font-size:10px;fill:var(--muted)">50</text>
+        <text class="arc-center arc-label" x="200" y="126" text-anchor="end" style="font-size:10px;fill:var(--muted)">100</text>
+      </svg>
+      <div class="arc-delta delta-same" id="arc-delta">No previous entry</div>
+    </div>
+  </div>
+
+  <!-- Manual form -->
+  <div class="card">
+    <div class="card-label">Manual Entry</div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Weight (kg) *</label>
+        <input class="form-input" id="inp-weight" type="number" step="0.1" placeholder="66.0">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input class="form-input" id="inp-date" type="date">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Body Fat %</label>
+        <input class="form-input" id="inp-bf" type="number" step="0.1" placeholder="22.5">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Muscle Rate %</label>
+        <input class="form-input" id="inp-mr" type="number" step="0.1" placeholder="45.9">
+      </div>
+    </div>
+
+    <div class="form-row3">
+      <div class="form-group">
+        <label class="form-label">BMI</label>
+        <input class="form-input" id="inp-bmi" type="number" step="0.1" placeholder="22.8">
+      </div>
+      <div class="form-group">
+        <label class="form-label">BMR (kcal)</label>
+        <input class="form-input" id="inp-bmr" type="number" placeholder="1393">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Visceral Fat</label>
+        <input class="form-input" id="inp-vf" type="number" step="0.1" placeholder="7">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Fat Mass (kg)</label>
+        <input class="form-input" id="inp-fm" type="number" step="0.01" placeholder="14.85">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Muscle Mass (kg)</label>
+        <input class="form-input" id="inp-mm" type="number" step="0.01" placeholder="30.29">
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">Bone Mass (kg)</label>
+        <input class="form-input" id="inp-bone" type="number" step="0.01" placeholder="2.60">
+      </div>
+      <div class="form-group">
+        <label class="form-label">Moisture %</label>
+        <input class="form-input" id="inp-moist" type="number" step="0.1" placeholder="56.8">
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">Notes (optional)</label>
+      <input class="form-input" id="inp-notes" type="text" placeholder="e.g. Post-meal, morning weigh-in…">
+    </div>
+
+    <button class="btn" onclick="saveEntry()">Save Entry</button>
+  </div>
+
+  <!-- Bulk import section -->
+  <div class="card">
+    <div class="card-label">Bulk Import from AI</div>
+    <p style="font-size:12px;color:var(--muted);line-height:1.5;margin-bottom:12px;">
+      Snap a photo of your scale report, send it to Claude or ChatGPT with the prompt below, then paste back what it gives you. Works for one entry or several at once.
+    </p>
+
+    <button class="btn btn-outline" style="margin-top:0;margin-bottom:10px;" onclick="copyPrompt()" id="copy-prompt-btn">📋 Copy AI Prompt</button>
+
+    <details class="prompt-details" style="margin-bottom:14px;">
+      <summary>View the prompt</summary>
+      <div class="prompt-box" id="prompt-box" style="margin-top:8px;"></div>
+    </details>
+
+    <div class="form-group">
+      <label class="form-label">Paste AI Response</label>
+      <textarea class="bulk-textarea" id="bulk-input" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder='Paste the JSON the AI gave you, e.g. [{"date":"2026-06-21","weight":66.0,"bmi":22.8,...}]'></textarea>
+    </div>
+
+    <button class="btn" onclick="parseBulkImport()">Parse &amp; Save</button>
+    <div id="bulk-result" style="display:none; margin-top:12px;"></div>
+  </div>
+</div>
+
+<!-- DASHBOARD SCREEN -->
+<div class="screen" id="screen-dash">
+
+  <!-- Summary tiles -->
+  <div class="section-title">Current Stats</div>
+  <div class="report-grid" id="dash-tiles">
+    <div class="report-tile">
+      <div class="report-tile-val num" id="dash-weight">––</div>
+      <div class="report-tile-lbl">Weight (kg)</div>
+      <div class="report-tile-status" id="dash-weight-badge"></div>
+    </div>
+    <div class="report-tile">
+      <div class="report-tile-val num" id="dash-bmi">––</div>
+      <div class="report-tile-lbl">BMI</div>
+      <div class="report-tile-status" id="dash-bmi-badge"></div>
+    </div>
+    <div class="report-tile">
+      <div class="report-tile-val num" id="dash-bf">––</div>
+      <div class="report-tile-lbl">Body Fat %</div>
+      <div class="report-tile-status" id="dash-bf-badge"></div>
+    </div>
+    <div class="report-tile">
+      <div class="report-tile-val num" id="dash-mr">––</div>
+      <div class="report-tile-lbl">Muscle Rate %</div>
+      <div class="report-tile-status" id="dash-mr-badge"></div>
+    </div>
+  </div>
+
+  <!-- Weight trend chart -->
+  <div class="card">
+    <div class="card-label">Weight Trend</div>
+    <div id="chart-container"><div class="chart-empty">Log at least 2 entries to see your trend</div></div>
+    <div id="chart-labels" class="chart-labels" style="display:none;"></div>
+  </div>
+
+  <!-- Body composition bars -->
+  <div class="card" id="composition-card" style="display:none;">
+    <div class="card-label">Body Composition</div>
+    <div id="composition-bars"></div>
+  </div>
+
+  <!-- Other indicators -->
+  <div class="card" id="other-card" style="display:none;">
+    <div class="card-label">Other Indicators</div>
+    <div class="stat-row" id="other-stats"></div>
+  </div>
+
+  <!-- AI Analysis -->
+  <div class="card">
+    <div class="card-label">AI Analysis</div>
+    <div id="ai-area">
+      <div class="chart-empty">Save at least one entry to get your AI analysis.</div>
+    </div>
+    <button class="btn btn-outline" id="ai-copy-btn" onclick="copyAnalysisPrompt()" style="display:none;">📋 Copy Analysis Prompt</button>
+    <div class="form-group" id="ai-paste-wrap" style="display:none; margin-top:12px;">
+      <label class="form-label">Paste AI Response</label>
+      <textarea class="bulk-textarea" id="ai-response-input" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Paste what Claude or ChatGPT wrote back…" style="min-height:90px;"></textarea>
+      <button class="btn" style="margin-top:10px;" onclick="showAIAnalysis()">Show Analysis</button>
+    </div>
+  </div>
+</div>
+
+<!-- HISTORY SCREEN -->
+<div class="screen" id="screen-history">
+  <div class="section-title">All Entries</div>
+  <div class="card" id="history-list">
+    <div class="chart-empty">No entries yet. Log your first weigh-in!</div>
+  </div>
+
+  <div class="card" style="display:none;" id="clear-card">
+    <button class="btn btn-outline" style="color:var(--red);border-color:var(--red-dim);" onclick="confirmClear()">Clear All Data</button>
+  </div>
+</div>
+
+<!-- Tab bar -->
+<div class="tabs">
+  <button class="tab active" onclick="showScreen('log', this)">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+    </svg>
+    Log
+  </button>
+  <button class="tab" onclick="showScreen('dash', this)">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+    </svg>
+    Dashboard
+  </button>
+  <button class="tab" onclick="showScreen('history', this)">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+    </svg>
+    History
+  </button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────
+const STORAGE_KEY = 'nevil_fitness_v1';
+let entries = [];
+
+function load() {
+  try { entries = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { entries = []; }
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
+}
+load();
+
+// ─── Helpers ──────────────────────────────────────────────────
+function showToast(msg, color = '#00E5A0') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = color;
+  t.style.color = color === '#00E5A0' ? '#0D1117' : '#fff';
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function fmtDate(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+}
+function fmtDay(d) {
+  const dt = new Date(d + 'T00:00:00');
+  return { day: dt.getDate(), mon: dt.toLocaleDateString('en-GB', { month:'short' }) };
+}
+
+function bmiStatus(v) {
+  if (!v) return '';
+  if (v < 18.5) return ['Underweight', 'blue'];
+  if (v < 25) return ['Standard', 'green'];
+  if (v < 30) return ['Overweight', 'amber'];
+  return ['Obese', 'red'];
+}
+function bfStatus(v, gender='male') {
+  if (!v) return '';
+  if (gender === 'male') {
+    if (v < 6) return ['Very Low', 'blue'];
+    if (v < 18) return ['Standard', 'green'];
+    if (v < 25) return ['Little high', 'amber'];
+    return ['High', 'red'];
+  }
+  return ['', ''];
+}
+function mrStatus(v) {
+  if (!v) return '';
+  if (v >= 40) return ['Standard', 'green'];
+  if (v >= 30) return ['Low', 'amber'];
+  return ['Very Low', 'red'];
+}
+
+function badge(label, color) {
+  if (!label) return '';
+  return `<span class="badge badge-${color}">${label}</span>`;
+}
+
+// ─── Arc ──────────────────────────────────────────────────────
+function updateArc(weight) {
+  const MIN = 50, MAX = 100;
+  const pct = Math.min(Math.max((weight - MIN) / (MAX - MIN), 0), 1);
+  const total = 283;
+  const fill = pct * total;
+  const el = document.getElementById('arc-fill');
+  el.style.strokeDashoffset = (total - fill);
+  document.getElementById('arc-val').textContent = weight ? weight.toFixed(1) : '––';
+}
+
+function updateArcDelta(current, prev) {
+  const el = document.getElementById('arc-delta');
+  if (!prev) { el.textContent = 'First entry'; el.className = 'arc-delta delta-same'; return; }
+  const diff = (current - prev).toFixed(1);
+  if (diff > 0) { el.textContent = `▲ ${diff} kg vs last`; el.className = 'arc-delta delta-up'; }
+  else if (diff < 0) { el.textContent = `▼ ${Math.abs(diff)} kg vs last`; el.className = 'arc-delta delta-down'; }
+  else { el.textContent = 'Same as last'; el.className = 'arc-delta delta-same'; }
+}
+
+// ─── Save Entry ───────────────────────────────────────────────
+function saveEntry() {
+  const w = parseFloat(document.getElementById('inp-weight').value);
+  if (!w || w < 20 || w > 300) { showToast('Enter a valid weight', '#FF5C5C'); return; }
+
+  const dateVal = document.getElementById('inp-date').value || new Date().toISOString().slice(0,10);
+  const entry = {
+    id: Date.now(),
+    date: dateVal,
+    weight: w,
+    bmi: parseFloat(document.getElementById('inp-bmi').value) || null,
+    bodyFat: parseFloat(document.getElementById('inp-bf').value) || null,
+    muscleRate: parseFloat(document.getElementById('inp-mr').value) || null,
+    bmr: parseFloat(document.getElementById('inp-bmr').value) || null,
+    visceralFat: parseFloat(document.getElementById('inp-vf').value) || null,
+    fatMass: parseFloat(document.getElementById('inp-fm').value) || null,
+    muscleMass: parseFloat(document.getElementById('inp-mm').value) || null,
+    boneMass: parseFloat(document.getElementById('inp-bone').value) || null,
+    moisture: parseFloat(document.getElementById('inp-moist').value) || null,
+    notes: document.getElementById('inp-notes').value.trim() || null,
+  };
+
+  // Remove same-date entry if exists, then push
+  entries = entries.filter(e => e.date !== dateVal);
+  entries.push(entry);
+  entries.sort((a,b) => a.date.localeCompare(b.date));
+  save();
+
+  // Clear fields
+  ['inp-weight','inp-bmi','inp-bf','inp-mr','inp-bmr','inp-vf','inp-fm','inp-mm','inp-bone','inp-moist','inp-notes'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('inp-date').value = '';
+
+  updateArc(w);
+  const prev = entries.length >= 2 ? entries[entries.length - 2].weight : null;
+  updateArcDelta(w, prev);
+
+  showToast('✓ Entry saved');
+  renderAll();
+}
+
+// ─── Screens ──────────────────────────────────────────────────
+const screenMeta = {
+  log: ['Log Entry', 'Track your body data'],
+  dash: ['Dashboard', 'Your progress at a glance'],
+  history: ['History', 'All recorded entries'],
+};
+
+function showScreen(name, tabEl) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  tabEl.classList.add('active');
+  document.getElementById('screen-title').textContent = screenMeta[name][0];
+  document.getElementById('screen-sub').textContent = screenMeta[name][1];
+  if (name === 'dash') renderDash();
+  if (name === 'history') renderHistory();
+}
+
+// ─── Dashboard ────────────────────────────────────────────────
+function renderDash() {
+  if (!entries.length) {
+    document.getElementById('dash-weight').textContent = '––';
+    document.getElementById('dash-bmi').textContent = '––';
+    document.getElementById('dash-bf').textContent = '––';
+    document.getElementById('dash-mr').textContent = '––';
+    ['dash-weight-badge','dash-bmi-badge','dash-bf-badge','dash-mr-badge'].forEach(id => document.getElementById(id).innerHTML = '');
+    document.getElementById('ai-area').innerHTML = '<div class="chart-empty">Save at least one entry to get your AI analysis.</div>';
+    document.getElementById('ai-copy-btn').style.display = 'none';
+    document.getElementById('ai-paste-wrap').style.display = 'none';
+    document.getElementById('chart-container').innerHTML = '<div class="chart-empty">Log at least 2 entries to see your trend</div>';
+    document.getElementById('composition-card').style.display = 'none';
+    document.getElementById('other-card').style.display = 'none';
+    return;
+  }
+
+  const latest = entries[entries.length - 1];
+
+  // Tiles
+  document.getElementById('dash-weight').textContent = latest.weight.toFixed(1);
+  document.getElementById('dash-bmi').textContent = latest.bmi ? latest.bmi.toFixed(1) : '––';
+  document.getElementById('dash-bf').textContent = latest.bodyFat ? latest.bodyFat.toFixed(1) + '%' : '––';
+  document.getElementById('dash-mr').textContent = latest.muscleRate ? latest.muscleRate.toFixed(1) + '%' : '––';
+
+  const bmi = bmiStatus(latest.bmi);
+  document.getElementById('dash-bmi-badge').innerHTML = bmi ? badge(bmi[0], bmi[1]) : '';
+  const bf = bfStatus(latest.bodyFat);
+  document.getElementById('dash-bf-badge').innerHTML = bf ? badge(bf[0], bf[1]) : '';
+  const mr = mrStatus(latest.muscleRate);
+  document.getElementById('dash-mr-badge').innerHTML = mr ? badge(mr[0], mr[1]) : '';
+
+  // Weight trend chart
+  if (entries.length >= 2) {
+    renderWeightChart();
+  } else {
+    document.getElementById('chart-container').innerHTML = '<div class="chart-empty">Log at least 2 entries to see your trend</div>';
+    document.getElementById('chart-labels').style.display = 'none';
+  }
+
+  // Composition bars
+  if (latest.fatMass || latest.muscleMass || latest.moisture || latest.boneMass) {
+    document.getElementById('composition-card').style.display = 'block';
+    const wt = latest.weight;
+    const bars = [
+      { label: 'Fat Mass', val: latest.fatMass, total: wt, unit: 'kg', color: '#F5A623' },
+      { label: 'Muscle Mass', val: latest.muscleMass, total: wt, unit: 'kg', color: '#00E5A0' },
+      { label: 'Moisture', val: latest.moisture ? (latest.moisture * wt / 100) : null, total: wt, unit: 'kg', color: '#4DA8FF' },
+      { label: 'Bone Mass', val: latest.boneMass, total: wt, unit: 'kg', color: '#A78BFF' },
+    ].filter(b => b.val);
+
+    document.getElementById('composition-bars').innerHTML = bars.map(b => `
+      <div class="prog-row">
+        <div class="prog-label">${b.label}</div>
+        <div class="prog-bar-wrap">
+          <div class="prog-bar" style="width:${(b.val/b.total*100).toFixed(1)}%;background:${b.color}"></div>
+        </div>
+        <div class="prog-val">${b.val.toFixed(2)}${b.unit}</div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('composition-card').style.display = 'none';
+  }
+
+  // Other indicators
+  const others = [
+    { label: 'BMR', val: latest.bmr ? latest.bmr + ' kcal' : null },
+    { label: 'Visceral Fat', val: latest.visceralFat != null ? latest.visceralFat : null },
+    { label: 'Body Fat %', val: latest.bodyFat ? latest.bodyFat + '%' : null },
+    { label: 'Moisture %', val: latest.moisture ? latest.moisture + '%' : null },
+  ].filter(o => o.val != null);
+
+  if (others.length) {
+    document.getElementById('other-card').style.display = 'block';
+    document.getElementById('other-stats').innerHTML = others.map(o => `
+      <div class="stat-pill">
+        <div class="stat-pill-val num">${o.val}</div>
+        <div class="stat-pill-lbl">${o.label}</div>
+      </div>
+    `).join('');
+  } else {
+    document.getElementById('other-card').style.display = 'none';
+  }
+
+  // AI section
+  document.getElementById('ai-copy-btn').style.display = 'block';
+  document.getElementById('ai-paste-wrap').style.display = 'block';
+}
+
+// ─── Mini chart ───────────────────────────────────────────────
+function renderWeightChart() {
+  const show = entries.slice(-10);
+  const weights = show.map(e => e.weight);
+  const minW = Math.min(...weights) - 1;
+  const maxW = Math.max(...weights) + 1;
+  const W = 320, H = 80;
+  const xStep = W / (show.length - 1);
+
+  const pts = show.map((e, i) => ({
+    x: i * xStep,
+    y: H - ((e.weight - minW) / (maxW - minW)) * H
+  }));
+
+  const pathD = pts.map((p,i) => (i===0?`M${p.x},${p.y}`:`L${p.x},${p.y}`)).join(' ');
+  const areaD = `${pathD} L${pts[pts.length-1].x},${H} L0,${H} Z`;
+
+  const svg = `
+    <svg class="mini-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="grad-mint" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#00E5A0" stop-opacity="0.25"/>
+          <stop offset="100%" stop-color="#00E5A0" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path class="chart-area" d="${areaD}"/>
+      <path class="chart-line" d="${pathD}"/>
+      ${pts.map((p,i) => i === pts.length-1
+        ? `<circle class="chart-dot-last" cx="${p.x}" cy="${p.y}" r="4"/>`
+        : `<circle class="chart-dot" cx="${p.x}" cy="${p.y}" r="2.5" opacity="0.6"/>`
+      ).join('')}
+    </svg>`;
+
+  document.getElementById('chart-container').innerHTML = svg;
+  document.getElementById('chart-labels').style.display = 'flex';
+  const step = Math.max(1, Math.floor(show.length / 4));
+  const labelsEl = document.getElementById('chart-labels');
+  labelsEl.innerHTML = '';
+  show.forEach((e, i) => {
+    if (i === 0 || i === show.length-1 || i % step === 0) {
+      const sp = document.createElement('span');
+      const {day,mon} = fmtDay(e.date);
+      sp.textContent = `${day} ${mon}`;
+      labelsEl.appendChild(sp);
+    }
+  });
+}
+
+// ─── History ──────────────────────────────────────────────────
+function renderHistory() {
+  const list = document.getElementById('history-list');
+  const clearCard = document.getElementById('clear-card');
+
+  if (!entries.length) {
+    list.innerHTML = '<div class="chart-empty">No entries yet. Log your first weigh-in!</div>';
+    clearCard.style.display = 'none';
+    return;
+  }
+  clearCard.style.display = 'block';
+
+  const sorted = [...entries].reverse();
+  list.innerHTML = sorted.map((e, i) => {
+    const {day, mon} = fmtDay(e.date);
+    const prev = sorted[i+1];
+    let deltaHtml = '';
+    if (prev) {
+      const diff = (e.weight - prev.weight).toFixed(1);
+      const col = diff > 0 ? 'var(--amber)' : diff < 0 ? 'var(--mint)' : 'var(--muted)';
+      const sym = diff > 0 ? '▲' : diff < 0 ? '▼' : '—';
+      deltaHtml = `<div class="entry-delta" style="color:${col}">${sym} ${Math.abs(diff)}</div>`;
+    }
+    const metas = [
+      e.bodyFat ? `BF ${e.bodyFat}%` : null,
+      e.muscleRate ? `MR ${e.muscleRate}%` : null,
+      e.bmi ? `BMI ${e.bmi}` : null,
+    ].filter(Boolean).join(' · ');
+    return `
+      <div class="entry">
+        <div class="entry-date-col">
+          <div class="entry-day num">${day}</div>
+          <div class="entry-mon">${mon}</div>
+        </div>
+        <div class="entry-info">
+          <div class="entry-weight num">${e.weight.toFixed(1)} kg</div>
+          ${metas ? `<div class="entry-meta">${metas}</div>` : ''}
+          ${e.notes ? `<div class="entry-meta" style="color:var(--muted2);font-style:italic">${e.notes}</div>` : ''}
+        </div>
+        ${deltaHtml}
+        <button class="entry-del" onclick="deleteEntry(${e.id})" title="Delete">✕</button>
+      </div>`;
+  }).join('');
+}
+
+function deleteEntry(id) {
+  entries = entries.filter(e => e.id !== id);
+  save();
+  renderHistory();
+  showToast('Entry removed', '#FF5C5C');
+}
+
+function confirmClear() {
+  if (confirm('Delete ALL entries? This cannot be undone.')) {
+    entries = [];
+    save();
+    renderHistory();
+    showToast('All data cleared', '#FF5C5C');
+  }
+}
+
+// ─── AI Analysis (copy prompt → paste response) ────────────────
+function buildAnalysisPrompt() {
+  if (!entries.length) return '';
+
+  const latest = entries[entries.length - 1];
+  const prev = entries.length > 1 ? entries[entries.length - 2] : null;
+  const weightChange = prev ? (latest.weight - prev.weight).toFixed(1) : null;
+  const allWeights = entries.map(e => e.weight);
+  const trend = allWeights.length > 1
+    ? (allWeights[allWeights.length-1] - allWeights[0]).toFixed(1)
+    : null;
+
+  const summary = `
+Name: Nevil | Age: 26 | Gender: Male | Height: 170cm
+Total entries: ${entries.length}
+Latest entry (${latest.date}):
+- Weight: ${latest.weight} kg
+- BMI: ${latest.bmi ?? 'not recorded'}
+- Body fat: ${latest.bodyFat ? latest.bodyFat + '%' : 'not recorded'}
+- Muscle rate: ${latest.muscleRate ? latest.muscleRate + '%' : 'not recorded'}
+- BMR: ${latest.bmr ? latest.bmr + ' kcal' : 'not recorded'}
+- Visceral fat index: ${latest.visceralFat ?? 'not recorded'}
+- Fat mass: ${latest.fatMass ? latest.fatMass + 'kg' : 'not recorded'}
+- Muscle mass: ${latest.muscleMass ? latest.muscleMass + 'kg' : 'not recorded'}
+- Bone mass: ${latest.boneMass ? latest.boneMass + 'kg' : 'not recorded'}
+- Moisture: ${latest.moisture ? latest.moisture + '%' : 'not recorded'}
+${weightChange ? `Weight change vs previous entry: ${weightChange} kg` : ''}
+${trend ? `Overall trend (${entries.length} entries): ${trend} kg total change` : ''}
+Standard reference ranges for male aged 26:
+- BMI: 18.5–24.9 (standard)
+- Body fat: 8–18% (standard), 18–25% (little high)
+- Muscle rate: 40%+ (standard)
+- Visceral fat: <11 (standard)
+- BMR reference: 1520–1858 kcal
+`;
+
+  return `You are a concise, data-driven fitness coach. Analyze this body composition data and give a personalized, honest summary in 3–4 short paragraphs. Be specific about numbers. Flag anything that needs attention. End with 1–2 actionable tips for the next week. Do not use headers or lists — write as flowing prose, plain text, no markdown. Keep it under 200 words.
+${summary}`;
+}
+
+function copyAnalysisPrompt() {
+  const prompt = buildAnalysisPrompt();
+  if (!prompt) { showToast('Save an entry first', '#FF5C5C'); return; }
+  copyTextToClipboard(prompt, document.getElementById('ai-copy-btn'));
+}
+
+function showAIAnalysis() {
+  const raw = document.getElementById('ai-response-input').value.trim();
+  if (!raw) { showToast('Paste the AI response first', '#FF5C5C'); return; }
+
+  const area = document.getElementById('ai-area');
+  area.innerHTML = `
+    <div class="ai-bubble">
+      <span class="ai-tag">AI · ${new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+      ${raw.split(/\n\s*\n/).map(p => `<p style="margin-bottom:10px">${p}</p>`).join('')}
+    </div>`;
+  document.getElementById('ai-response-input').value = '';
+  showToast('✓ Analysis added');
+}
+
+// ─── Bulk Import (paste AI-extracted data) ─────────────────────
+const AI_PROMPT = `You are a data-extraction assistant. I'm sending you one or more photos of a body composition scale report. For each photo, read off the values exactly as shown on screen and return them in this exact JSON format — return ONLY the JSON, no other text, no markdown code fences, no commentary:
+
+[
+  {
+    "date": "YYYY-MM-DD",
+    "weight": number,
+    "bmi": number,
+    "bodyFat": number,
+    "muscleRate": number,
+    "bmr": number,
+    "visceralFat": number,
+    "fatMass": number,
+    "muscleMass": number,
+    "boneMass": number,
+    "moisture": number,
+    "notes": null
+  }
+]
+
+Rules:
+- Always return a JSON array, even if there's only one photo (one object per photo).
+- Use null for any field that isn't visible in the photo — never guess or estimate.
+- Weight must be in kilograms.
+- If the date isn't shown on the report, set "date" to null.
+- Return valid JSON only — nothing before or after it.`;
+
+function copyPrompt() {
+  copyTextToClipboard(AI_PROMPT, document.getElementById('copy-prompt-btn'));
+}
+
+function copyTextToClipboard(text, btn) {
+  const original = btn.textContent;
+  const reset = () => { btn.textContent = original; };
+  const onCopied = () => { btn.textContent = '✓ Copied'; setTimeout(reset, 1800); };
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(onCopied).catch(() => fallbackCopy(text, onCopied));
+  } else {
+    fallbackCopy(text, onCopied);
+  }
+}
+
+function fallbackCopy(text, onCopied) {
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.style.position = 'fixed';
+  ta.style.opacity = '0';
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand('copy'); onCopied(); }
+  catch { showToast('Copy failed — open "View the prompt" and copy manually', '#FF5C5C'); }
+  document.body.removeChild(ta);
+}
+
+function parseBulkImport() {
+  const raw = document.getElementById('bulk-input').value.trim();
+  const resultDiv = document.getElementById('bulk-result');
+  resultDiv.style.display = 'block';
+
+  if (!raw) {
+    resultDiv.innerHTML = `
+      <div class="ai-bubble" style="border-color:var(--red-dim);background:var(--red-dim)">
+        <span class="ai-tag" style="color:var(--red)">Nothing to parse</span>
+        <p style="font-size:13px">Paste the JSON the AI gave you first.</p>
+      </div>`;
+    return;
+  }
+
+  let parsed;
+  try {
+    const clean = raw
+      .replace(/```json|```/g, '')
+      .replace(/[\u201C\u201D]/g, '"')   // smart double quotes → straight
+      .replace(/[\u2018\u2019]/g, "'")   // smart single quotes → straight
+      .trim();
+    parsed = JSON.parse(clean);
+  } catch (err) {
+    resultDiv.innerHTML = `
+      <div class="ai-bubble" style="border-color:var(--red-dim);background:var(--red-dim)">
+        <span class="ai-tag" style="color:var(--red)">Could not parse</span>
+        <p style="font-size:13px">That doesn't look like valid JSON. Paste the AI's full response exactly as it gave it to you, with nothing else added or removed.</p>
+      </div>`;
+    return;
+  }
+
+  const records = Array.isArray(parsed) ? parsed : [parsed];
+  let added = 0, skipped = 0;
+
+  records.forEach((r, i) => {
+    const w = r && r.weight != null ? parseFloat(r.weight) : NaN;
+    if (!r || isNaN(w) || w < 20 || w > 300) { skipped++; return; }
+
+    const dateVal = r.date || new Date().toISOString().slice(0,10);
+    const entry = {
+      id: Date.now() + i,
+      date: dateVal,
+      weight: w,
+      bmi: r.bmi != null ? parseFloat(r.bmi) : null,
+      bodyFat: r.bodyFat != null ? parseFloat(r.bodyFat) : null,
+      muscleRate: r.muscleRate != null ? parseFloat(r.muscleRate) : null,
+      bmr: r.bmr != null ? parseFloat(r.bmr) : null,
+      visceralFat: r.visceralFat != null ? parseFloat(r.visceralFat) : null,
+      fatMass: r.fatMass != null ? parseFloat(r.fatMass) : null,
+      muscleMass: r.muscleMass != null ? parseFloat(r.muscleMass) : null,
+      boneMass: r.boneMass != null ? parseFloat(r.boneMass) : null,
+      moisture: r.moisture != null ? parseFloat(r.moisture) : null,
+      notes: r.notes || null,
+    };
+
+    entries = entries.filter(e => e.date !== dateVal);
+    entries.push(entry);
+    added++;
+  });
+
+  if (added) {
+    entries.sort((a,b) => a.date.localeCompare(b.date));
+    save();
+
+    const latest = entries[entries.length - 1];
+    updateArc(latest.weight);
+    const prev = entries.length >= 2 ? entries[entries.length - 2].weight : null;
+    updateArcDelta(latest.weight, prev);
+
+    document.getElementById('bulk-input').value = '';
+  }
+
+  resultDiv.innerHTML = `
+    <div class="ai-bubble" style="border-color:${added ? 'var(--mint)' : 'var(--red-dim)'};background:${added ? 'var(--mint-dim)' : 'var(--red-dim)'}">
+      <span class="ai-tag" style="color:${added ? 'var(--mint)' : 'var(--red)'}">${added ? '✓ Import complete' : 'Nothing imported'}</span>
+      <p style="font-size:13px">${added} ${added === 1 ? 'entry' : 'entries'} saved${skipped ? `, ${skipped} skipped (missing or invalid weight)` : ''}.</p>
+    </div>`;
+
+  if (added) showToast(`✓ ${added} ${added === 1 ? 'entry' : 'entries'} imported`);
+  renderAll();
+}
+
+// ─── renderAll ─────────────────────────────────────────────────
+function renderAll() {
+  renderDash();
+  renderHistory();
+}
+
+// ─── Init ──────────────────────────────────────────────────────
+document.getElementById('inp-date').value = new Date().toISOString().slice(0,10);
+
+// Restore arc from latest entry
+if (entries.length) {
+  const latest = entries[entries.length-1];
+  updateArc(latest.weight);
+  const prev = entries.length > 1 ? entries[entries.length-2].weight : null;
+  updateArcDelta(latest.weight, prev);
+}
+
+// Populate the visible "view the prompt" box
+document.getElementById('prompt-box').textContent = AI_PROMPT;
+</script>
+</body>
+</html>
